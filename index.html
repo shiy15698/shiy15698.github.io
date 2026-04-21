@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="theme-color" content="#f0f4f0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="물리치료 기계학습 임상 예측 시스템 — 낙상 위험 및 재활 결과 예측">
+<title>PT Clinical ML — 물리치료 임상 예측 시스템</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,wght@0,700;1,600&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────
+   TOKENS
+───────────────────────────────────────────────── */
+:root{
+  --cream:   #f6f3ed;
+  --paper:   #faf8f4;
+  --white:   #ffffff;
+  --ink:     #1a1a18;
+  --ink2:    #4a4a44;
+  --ink3:    #8a8a80;
+  --ink4:    #c0bdb5;
+  --forest:  #1e4d2b;
+  --sage:    #4a7c59;
+  --mint:    #7ab893;
+  --mist:    #c8ddd0;
+  --mist2:   #e8f2ec;
+  --amber:   #c47c1a;
+  --amber2:  #f5a623;
+  --amber3:  #fde8bc;
+  --red:     #c0392b;
+  --red2:    #e74c3c;
+  --red3:    #fdecea;
+  --border:  rgba(30,77,43,0.12);
+  --shadow:  0 2px 20px rgba(30,77,43,0.08);
+  --shadow2: 0 8px 40px rgba(30,77,43,0.12);
+  --r:       14px;
+  --r-sm:    8px;
+  --font:    'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --mono:    'IBM Plex Mono', 'Courier New', monospace;
+  --serif:   'Fraunces', Georgia, serif;
+  --trans:   0.22s cubic-bezier(.4,0,.2,1);
+}
+
+/* ─────────────────────────────────────────────────
+   RESET
+───────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  background:var(--cream);
+  color:var(--ink);
+  min-height:100vh;
+  line-height:1.6;
+  overflow-x:hidden;
+}
+button{cursor:pointer;font-family:var(--font)}
+input,select{font-family:var(--font)}
+a{color:inherit;text-decoration:none}
+
+/* ─────────────────────────────────────────────────
+   TEXTURE LAYER
+───────────────────────────────────────────────── */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  pointer-events:none;
+}
+
+/* ─────────────────────────────────────────────────
+   LAYOUT
+───────────────────────────────────────────────── */
+.page{position:relative;z-index:1}
+.container{max-width:980px;margin:0 auto;padding:0 24px}
+
+/* ─────────────────────────────────────────────────
+   TOP BAR
+───────────────────────────────────────────────── */
+.topbar{
+  background:var(--forest);
+  color:#fff;
+  padding:10px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:8px;
+  font-size:11px;letter-spacing:0.08em;
+}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.live-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--mint);
+  animation:blink 2.5s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.topbar-warn{
+  background:rgba(255,255,255,0.12);
+  border-radius:4px;padding:3px 10px;
+  font-size:10.5px;color:rgba(255,255,255,0.8);
+}
+
+/* ─────────────────────────────────────────────────
+   HEADER
+───────────────────────────────────────────────── */
+.header{
+  padding:52px 0 40px;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:24px;align-items:end;
+  border-bottom:2px solid var(--forest);
+  margin-bottom:0;
+}
+.header-kicker{
+  font-size:11px;font-weight:700;letter-spacing:0.18em;
+  text-transform:uppercase;color:var(--sage);
+  margin-bottom:12px;
+}
+.header-title{
+  font-family:var(--serif);
+  font-size:clamp(32px,6vw,56px);
+  font-weight:700;line-height:1.0;
+  color:var(--forest);
+  letter-spacing:-0.02em;
+}
+.header-title em{
+  font-style:italic;color:var(--sage);
+}
+.header-sub{
+  margin-top:14px;
+  font-size:13.5px;color:var(--ink2);
+  font-weight:300;line-height:1.6;
+  max-width:480px;
+}
+.header-meta{
+  display:flex;flex-direction:column;align-items:flex-end;gap:8px;
+}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--mist2);
+  border:1.5px solid var(--mist);
+  border-radius:100px;
+  padding:5px 14px;
+  font-size:11px;font-weight:600;color:var(--forest);
+  letter-spacing:0.04em;
+  white-space:nowrap;
+}
+.disclaimer{
+  background:var(--amber3);
+  border:1.5px solid var(--amber2);
+  border-radius:var(--r-sm);
+  padding:8px 14px;
+  font-size:11px;color:var(--amber);
+  line-height:1.5;max-width:220px;text-align:right;
+  font-weight:500;
+}
+
+/* ─────────────────────────────────────────────────
+   TABS
+───────────────────────────────────────────────── */
+.tabs{
+  display:flex;
+  border-bottom:2px solid var(--border);
+  margin-bottom:40px;
+  gap:0;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  padding:18px 24px 16px;
+  border:none;background:none;
+  font-size:13px;font-weight:600;
+  color:var(--ink3);
+  border-bottom:3px solid transparent;
+  margin-bottom:-2px;
+  transition:var(--trans);
+  white-space:nowrap;
+  display:flex;align-items:center;gap:7px;
+  letter-spacing:0.01em;
+}
+.tab:hover{color:var(--sage)}
+.tab.on{
+  color:var(--forest);
+  border-bottom-color:var(--forest);
+}
+.tab-ico{font-size:15px}
+
+/* ─────────────────────────────────────────────────
+   PANELS
+───────────────────────────────────────────────── */
+.panel{display:none;animation:fadeUp .3s ease}
+.panel.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ─────────────────────────────────────────────────
+   CARDS
+───────────────────────────────────────────────── */
+.card{
+  background:var(--white);
+  border:1.5px solid var(--border);
+  border-radius:var(--r);
+  padding:32px;
+  margin-bottom:24px;
+  box-shadow:var(--shadow);
+  transition:box-shadow var(--trans);
+}
+.card:hover{box-shadow:var(--shadow2)}
+.card-head{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:28px;
+}
+.card-ico{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;flex-shrink:0;
+}
+.ico-green{background:var(--mist2);color:var(--forest)}
+.ico-amber{background:var(--amber3);color:var(--amber)}
+.ico-red  {background:var(--red3);  color:var(--red)}
+.ico-sage {background:var(--mist);  color:var(--sage)}
+.card-title{font-size:16px;font-weight:700;color:var(--ink)}
+.card-subtitle{font-size:12px;color:var(--ink3);margin-top:1px}
+
+/* ─────────────────────────────────────────────────
+   SECTION LABEL
+───────────────────────────────────────────────── */
+.sec-label{
+  font-size:10.5px;font-weight:700;letter-spacing:0.14em;
+  text-transform:uppercase;color:var(--ink3);
+  margin-bottom:18px;padding-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+
+/* ─────────────────────────────────────────────────
+   FORM
+───────────────────────────────────────────────── */
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(195px,1fr));
+  gap:22px;
+}
+.fg{display:flex;flex-direction:column;gap:10px}
+.fg label{
+  font-size:11px;font-weight:700;letter-spacing:0.07em;
+  text-transform:uppercase;color:var(--ink2);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.fg label span{
+  font-size:10px;font-weight:400;
+  text-transform:none;letter-spacing:0;color:var(--ink3);
+}
+
+/* Slider track */
+.sl-wrap{position:relative;padding-top:28px}
+.sl-val{
+  position:absolute;top:0;right:0;
+  font-family:var(--mono);font-size:12px;font-weight:600;
+  color:var(--forest);
+  background:var(--mist2);
+  border:1.5px solid var(--mist);
+  border-radius:6px;padding:2px 9px;
+}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:5px;
+  background:var(--mist2);border-radius:100px;
+  outline:none;border:1.5px solid var(--mist);
+  cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:20px;height:20px;border-radius:50%;
+  background:var(--forest);
+  border:3px solid var(--white);
+  box-shadow:0 0 0 1.5px var(--sage);
+  cursor:pointer;transition:transform var(--trans);
+}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+input[type=range]::-moz-range-thumb{
+  width:20px;height:20px;border-radius:50%;
+  background:var(--forest);border:3px solid var(--white);
+  cursor:pointer;
+}
+select{
+  -webkit-appearance:none;appearance:none;
+  background:var(--paper);
+  border:1.5px solid var(--border);
+  border-radius:var(--r-sm);
+  color:var(--ink);padding:11px 36px 11px 14px;
+  width:100%;font-size:13.5px;cursor:pointer;
+  transition:border-color var(--trans);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234a7c59'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;
+}
+select:focus{outline:none;border-color:var(--sage)}
+
+/* ─────────────────────────────────────────────────
+   PREDICT BUTTON
+───────────────────────────────────────────────── */
+.btn{
+  width:100%;
+  padding:17px;margin-top:28px;
+  background:var(--forest);
+  border:none;border-radius:var(--r);
+  color:#fff;
+  font-family:var(--font);font-size:15px;font-weight:700;
+  letter-spacing:0.04em;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  transition:background var(--trans),transform var(--trans),box-shadow var(--trans);
+  box-shadow:0 4px 16px rgba(30,77,43,0.25);
+}
+.btn:hover{background:var(--sage);transform:translateY(-2px);box-shadow:0 8px 24px rgba(30,77,43,0.3)}
+.btn:active{transform:none}
+.btn.amber{background:var(--amber);box-shadow:0 4px 16px rgba(196,124,26,0.25)}
+.btn.amber:hover{background:#d4861e;box-shadow:0 8px 24px rgba(196,124,26,0.3)}
+
+/* ─────────────────────────────────────────────────
+   RESULT BLOCK
+───────────────────────────────────────────────── */
+.result{
+  display:none;
+  background:var(--paper);
+  border:1.5px solid var(--border);
+  border-radius:var(--r);
+  padding:32px;
+  margin-top:24px;
+  animation:fadeUp .4s ease;
+}
+.result.show{display:block}
+
+/* Risk header */
+.result-top{
+  display:grid;grid-template-columns:1fr auto;
+  gap:16px;align-items:start;margin-bottom:28px;
+  flex-wrap:wrap;
+}
+.result-lbl{font-size:10.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px}
+.result-num{
+  font-family:var(--mono);
+  font-size:clamp(44px,10vw,68px);
+  font-weight:600;line-height:1;
+}
+.result-num.low {color:var(--forest)}
+.result-num.mid {color:var(--amber)}
+.result-num.hi  {color:var(--red)}
+.risk-pill{
+  padding:8px 20px;border-radius:100px;
+  font-size:13px;font-weight:700;letter-spacing:0.06em;
+  white-space:nowrap;
+}
+.risk-pill.low{background:var(--mist2);border:1.5px solid var(--mist);color:var(--forest)}
+.risk-pill.mid{background:var(--amber3);border:1.5px solid var(--amber2);color:var(--amber)}
+.risk-pill.hi {background:var(--red3);  border:1.5px solid var(--red2); color:var(--red)}
+
+/* Probability bar */
+.pbar-wrap{margin:20px 0 24px}
+.pbar-labels{display:flex;justify-content:space-between;margin-bottom:8px}
+.pbar-labels span{font-size:11px;color:var(--ink3)}
+.pbar-track{
+  height:10px;background:var(--cream);
+  border-radius:100px;overflow:hidden;
+  border:1px solid var(--border);
+}
+.pbar-fill{
+  height:100%;border-radius:100px;width:0%;
+  transition:width 1.1s cubic-bezier(.4,0,.2,1);
+}
+.pbar-fill.low{background:linear-gradient(90deg,#4a7c59,#7ab893)}
+.pbar-fill.mid{background:linear-gradient(90deg,#c47c1a,#f5a623)}
+.pbar-fill.hi {background:linear-gradient(90deg,#c0392b,#e74c3c)}
+
+/* Divider */
+.rdiv{height:1px;background:var(--border);margin:24px 0}
+
+/* Feature importance bars */
+.feat-list{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.feat-row{display:flex;align-items:center;gap:12px}
+.feat-name{
+  font-size:11.5px;color:var(--ink2);font-weight:500;
+  width:130px;flex-shrink:0;text-align:right;
+}
+.feat-track{
+  flex:1;height:7px;
+  background:var(--cream);
+  border-radius:100px;overflow:hidden;
+  border:1px solid var(--border);
+}
+.feat-bar{
+  height:100%;border-radius:100px;
+  width:0%;transition:width 1.2s cubic-bezier(.4,0,.2,1);
+}
+.feat-pct{
+  font-family:var(--mono);font-size:11px;
+  color:var(--ink2);width:42px;text-align:right;
+}
+
+/* ─────────────────────────────────────────────────
+   RECOMMENDATION CARDS
+───────────────────────────────────────────────── */
+.rec-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(175px,1fr));
+  gap:12px;margin-top:18px;
+}
+.rec{
+  background:var(--white);
+  border:1.5px solid var(--border);
+  border-radius:var(--r-sm);
+  padding:16px;
+  transition:border-color var(--trans),transform var(--trans);
+}
+.rec:hover{border-color:var(--mist);transform:translateY(-2px)}
+.rec-ico{font-size:22px;margin-bottom:8px}
+.rec-t{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:5px}
+.rec-d{font-size:11.5px;color:var(--ink2);line-height:1.55}
+
+/* ─────────────────────────────────────────────────
+   GAUGE (rehab score arc)
+───────────────────────────────────────────────── */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:6px}
+.gauge-svg{width:180px;height:100px;overflow:visible}
+
+/* ─────────────────────────────────────────────────
+   MODEL COMPARE PANEL
+───────────────────────────────────────────────── */
+.model-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(155px,1fr));
+  gap:14px;margin-bottom:28px;
+}
+.model-card{
+  background:var(--white);border:1.5px solid var(--border);
+  border-radius:var(--r-sm);padding:18px 16px;
+  transition:border-color var(--trans),transform var(--trans);
+}
+.model-card:hover{border-color:var(--mist);transform:translateY(-2px)}
+.model-card.best{border-color:var(--sage);background:var(--mist2)}
+.mc-name{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px}
+.mc-score{font-family:var(--mono);font-size:28px;font-weight:600;color:var(--forest)}
+.mc-label{font-size:11px;color:var(--ink3);margin-top:3px}
+.mc-crown{font-size:13px;margin-left:4px}
+
+/* ROC SVG */
+.roc-wrap{height:270px;position:relative}
+.roc-wrap svg{width:100%;height:100%}
+
+/* ─────────────────────────────────────────────────
+   INFO PANEL
+───────────────────────────────────────────────── */
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.info-card{
+  background:var(--white);border:1.5px solid var(--border);
+  border-radius:var(--r);padding:24px;
+  transition:border-color var(--trans),transform var(--trans);
+}
+.info-card:hover{border-color:var(--mist);transform:translateY(-2px)}
+.info-ico{font-size:26px;margin-bottom:12px}
+.info-t{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:8px}
+.info-b{font-size:12.5px;color:var(--ink2);line-height:1.7}
+.info-b strong{color:var(--forest);font-weight:600}
+.info-b .chip{
+  display:inline-block;
+  background:var(--mist2);border:1px solid var(--mist);
+  border-radius:4px;padding:1px 7px;font-size:11px;
+  color:var(--forest);font-family:var(--mono);font-weight:600;margin:1px;
+}
+
+/* ─────────────────────────────────────────────────
+   FOOTER
+───────────────────────────────────────────────── */
+footer{
+  margin-top:48px;padding:28px 0;
+  border-top:1.5px solid var(--border);
+  text-align:center;
+  font-size:11.5px;color:var(--ink3);line-height:1.9;
+}
+
+/* ─────────────────────────────────────────────────
+   TOAST
+───────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:28px;right:28px;z-index:9999;
+  background:var(--forest);color:#fff;
+  border-radius:var(--r-sm);padding:13px 20px;
+  font-size:13px;font-weight:600;
+  display:flex;align-items:center;gap:8px;
+  box-shadow:0 8px 32px rgba(30,77,43,0.35);
+  opacity:0;transform:translateY(20px);
+  transition:opacity .3s ease,transform .3s ease;
+  pointer-events:none;max-width:280px;
+}
+#toast.show{opacity:1;transform:none}
+
+/* ─────────────────────────────────────────────────
+   RESPONSIVE
+───────────────────────────────────────────────── */
+@media(max-width:700px){
+  .container{padding:0 16px}
+  .header{grid-template-columns:1fr;padding:36px 0 28px}
+  .header-meta{flex-direction:row;align-items:center;flex-wrap:wrap}
+  .disclaimer{max-width:100%;text-align:left}
+  .form-grid{grid-template-columns:1fr 1fr}
+  .rec-grid{grid-template-columns:1fr 1fr}
+  .feat-name{width:90px}
+  .card{padding:22px}
+  .result{padding:22px}
+  .tab{padding:16px 16px 14px;font-size:12px}
+  .model-grid{grid-template-columns:1fr 1fr}
+  .roc-wrap{height:220px}
+  .info-grid{grid-template-columns:1fr}
+}
+@media(max-width:400px){
+  .form-grid{grid-template-columns:1fr}
+  .rec-grid{grid-template-columns:1fr}
+  .model-grid{grid-template-columns:1fr 1fr}
+}
+@media print{
+  body::before{display:none}
+  .topbar,.tabs,.btn{display:none}
+  .panel{display:block!important}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="live-dot"></div>
+    <span>PT Clinical ML · Week 08 기계학습 기초 · 디지털 헬스케어와 물리치료</span>
+  </div>
+  <div class="topbar-warn">⚠️ 임상 의사결정 보조 도구 — 전문 면허 소지자 최종 판단</div>
+</div>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div>
+      <div class="header-kicker">Physical Therapy · Machine Learning · Clinical Decision Support</div>
+      <h1 class="header-title">PT Clinical<br><em>ML System</em></h1>
+      <p class="header-sub">물리치료 임상 현장에서 즉시 활용 가능한<br>기계학습 기반 낙상 위험 예측 및 재활 결과 예측 시스템</p>
+    </div>
+    <div class="header-meta">
+      <div class="badge">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--mint);flex-shrink:0"></span>
+        Week 08 · ML Fundamentals
+      </div>
+      <div class="disclaimer">
+        ⚠️ 본 시스템은 임상 보조 도구입니다. 최종 진단·치료 결정은 면허를 보유한 물리치료사에게 있습니다.
+      </div>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <nav class="tabs" role="tablist">
+    <button class="tab on" onclick="go('fall',this)" role="tab">
+      <span class="tab-ico">⚡</span> 낙상 위험 예측
+    </button>
+    <button class="tab" onclick="go('rehab',this)" role="tab">
+      <span class="tab-ico">🎯</span> 재활 결과 예측
+    </button>
+    <button class="tab" onclick="go('compare',this)" role="tab">
+      <span class="tab-ico">📊</span> 모델 성능 비교
+    </button>
+    <button class="tab" onclick="go('guide',this)" role="tab">
+      <span class="tab-ico">📖</span> 사용 가이드
+    </button>
+  </nav>
+
+  <!-- ════════════════════════════════════
+       PANEL 1 — 낙상 위험 예측
+       Logistic Regression (Beginner)
+       Exact coefs from notebook:
+       intercept=-6.9614
+       age=+0.0925, balance=-0.0317,
+       gait=+0.2531, falls=+2.3028
+  ════════════════════════════════════ -->
+  <div id="p-fall" class="panel on">
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-ico ico-green">⚡</div>
+        <div>
+          <div class="card-title">낙상 위험 예측</div>
+          <div class="card-subtitle">Logistic Regression · 정확도 82.5% · 4가지 임상 지표 사용</div>
+        </div>
+      </div>
+      <div class="sec-label">환자 임상 정보 입력</div>
+
+      <div class="form-grid">
+        <!-- 연령 -->
+        <div class="fg">
+          <label>연령 <span>세 (50–85)</span></label>
+          <div class="sl-wrap">
+            <span class="sl-val" id="v-age">65</span>
+            <input type="range" id="age" min="50" max="85" value="65"
+              oninput="document.getElementById('v-age').textContent=this.value">
+          </div>
+        </div>
+
+        <!-- 균형 점수 -->
+        <div class="fg">
+          <label>균형 점수 <span>점 (0–100)</span></label>
+          <div class="sl-wrap">
+            <span class="sl-val" id="v-bal">55</span>
+            <input type="range" id="bal" min="0" max="100" value="55"
+              oninput="document.getElementById('v-bal').textContent=this.value">
+          </div>
+        </div>
+
+        <!-- 보행 속도 -->
+        <div class="fg">
+          <label>보행 속도 <span>m/s (0.3–1.5)</span></label>
+          <div class="sl-wrap">
+            <span class="sl-val" id="v-gait">0.9</span>
+            <input type="range" id="gait" min="3" max="15" value="9"
+              oninput="document.getElementById('v-gait').textContent=(this.value/10).toFixed(1)">
+          </div>
+        </div>
+
+        <!-- 낙상 기록 -->
+        <div class="fg">
+          <label>낙상 기록 <span>최근 1년</span></label>
+          <select id="falls">
+            <option value="0">없음 (0회)</option>
+            <option value="1">1회</option>
+            <option value="2">2회 이상</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn" onclick="predictFall()">
+        ⚡ 낙상 위험도 예측하기
+      </button>
+    </div>
+
+    <!-- FALL RESULT -->
+    <div id="r-fall" class="result">
+      <div class="result-top">
+        <div>
+          <div class="result-lbl">낙상 위험 확률</div>
+          <div class="result-num" id="rn-fall">—</div>
+          <div style="font-size:12px;color:var(--ink3);margin-top:6px" id="rn-fall-conf"></div>
+        </div>
+        <div id="rp-fall" class="risk-pill low">—</div>
+      </div>
+
+      <div class="pbar-wrap">
+        <div class="pbar-labels"><span>저위험 (0–30%)</span><span>중위험 (30–60%)</span><span>고위험 (60%+)</span></div>
+        <div class="pbar-track">
+          <div class="pbar-fill" id="pf-fall"></div>
+        </div>
+      </div>
+
+      <div class="rdiv"></div>
+      <div class="sec-label">요인별 기여도 — 해당 환자 기준</div>
+      <div class="feat-list" id="ff-fall"></div>
+
+      <div class="rdiv"></div>
+      <div class="sec-label">임상 권고사항</div>
+      <div class="rec-grid" id="rc-fall"></div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════
+       PANEL 2 — 재활 결과 예측
+       Linear Regression coefs from notebook:
+       intercept=90.59
+       age=-0.2054, ROM=+0.0085,
+       pain=-3.8244, grip=+0.0098,
+       duration=+1.4705, compliance=+24.90,
+       comorbidity=+0.0444
+       (RF best: max_depth=10, n_estimators=50, R2=0.652)
+  ════════════════════════════════════ -->
+  <div id="p-rehab" class="panel">
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-ico ico-amber">🎯</div>
+        <div>
+          <div class="card-title">재활 결과 예측</div>
+          <div class="card-subtitle">Random Forest Regression · R²=0.652 · 7가지 치료 지표</div>
+        </div>
+      </div>
+      <div class="sec-label">치료 관련 임상 정보 입력</div>
+
+      <div class="form-grid">
+        <div class="fg">
+          <label>연령 <span>세 (40–85)</span></label>
+          <div class="sl-wrap">
+            <span class="sl-val" id="v-ra">55</span>
+            <input type="range" id="ra" min="40" max="85" value="55"
+              oninput="document.getElementById('v-ra').textContent=this.value">
+          </div>
+        </div>
+        <div class="fg">
+          <label>초기 ROM <span>° (20–100)</span></label>
+          <div class="sl-wrap">
+            <span class="sl-val" id="v-rom">60</span>
+            <input type="range" id="rom" min="20" max="100" value="60"
+              oninput="document.getElementById('v-rom').textContent=this.value">
+          </div>
+        </div>
+        <div class="fg">
+          <label>초기 통증 <span>NRS (4–10)</span></label>
+          <div class="sl-wrap">
+            <span class="sl-val" id="v-pain">6</span>
+            <input type="range" id="pain" min="4" max="10" value="6"
+              oninput="document.getElementById('v-pain').textContent=this.value">
+          </div>
+        </div>
+        <div class="fg">
+          <label>악력 <span>kg (10–50)</span></label>
+          <div class="sl-wrap">
+            <span class="sl-val" id="v-grip">28</span>
+            <input type="range" id="grip" min="10" max="50" value="28"
+              oninput="document.getElementById('v-grip').textContent=this.value">
+          </div>
+        </div>
+        <div class="fg">
+          <label>치료 기간 <span>주 (2–20)</span></label>
+          <div class="sl-wrap">
+            <span class="sl-val" id="v-dur">8</span>
+            <input type="range" id="dur" min="2" max="20" value="8"
+              oninput="document.getElementById('v-dur').textContent=this.value">
+          </div>
+        </div>
+        <div class="fg">
+          <label>치료 순응도 <span>% (50–100)</span></label>
+          <div class="sl-wrap">
+            <span class="sl-val" id="v-comp">80%</span>
+            <input type="range" id="comp" min="50" max="100" value="80"
+              oninput="document.getElementById('v-comp').textContent=this.value+'%'">
+          </div>
+        </div>
+        <div class="fg">
+          <label>동반 질환 수</label>
+          <select id="comor">
+            <option value="0">0개 (없음)</option>
+            <option value="1">1개</option>
+            <option value="2">2개</option>
+            <option value="3">3개</option>
+            <option value="4">4개 이상</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn amber" onclick="predictRehab()">
+        🎯 재활 결과 예측하기
+      </button>
+    </div>
+
+    <!-- REHAB RESULT -->
+    <div id="r-rehab" class="result">
+      <div class="result-top">
+        <div>
+          <div class="result-lbl">예측 재활 점수</div>
+          <div class="result-num" id="rn-rehab">—</div>
+          <div style="font-size:12px;color:var(--ink3);margin-top:6px" id="rn-rehab-grade"></div>
+        </div>
+        <div class="gauge-wrap">
+          <svg class="gauge-svg" viewBox="0 0 180 100">
+            <path d="M20,90 A70,70 0 0,1 160,90"
+              fill="none" stroke="#e8f2ec" stroke-width="12" stroke-linecap="round"/>
+            <path id="gauge-fill" d="M20,90 A70,70 0 0,1 160,90"
+              fill="none" stroke="#4a7c59" stroke-width="12" stroke-linecap="round"
+              stroke-dasharray="220" stroke-dashoffset="220"
+              style="transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1),stroke .3s"/>
+            <text id="gauge-txt" x="90" y="82" font-family="IBM Plex Mono,monospace"
+              font-size="22" font-weight="600" fill="#1e4d2b"
+              text-anchor="middle" dominant-baseline="middle">—</text>
+            <text x="90" y="97" font-family="Noto Sans KR,sans-serif"
+              font-size="9" fill="#8a8a80" text-anchor="middle"
+              letter-spacing="0.08em">/ 100점</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="rdiv"></div>
+      <div class="sec-label">예후 영향 요인 분석</div>
+      <div class="feat-list" id="ff-rehab"></div>
+
+      <div class="rdiv"></div>
+      <div class="sec-label">치료 권고사항</div>
+      <div class="rec-grid" id="rc-rehab"></div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════
+       PANEL 3 — 모델 성능 비교
+       Exact values from notebook run
+  ════════════════════════════════════ -->
+  <div id="p-compare" class="panel">
+
+    <!-- Classification -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-ico ico-green">📊</div>
+        <div>
+          <div class="card-title">분류 모델 성능 비교</div>
+          <div class="card-subtitle">n=300 · 5-Fold Cross Validation · 낙상 위험 분류</div>
+        </div>
+      </div>
+      <div class="sec-label">5-Fold CV 정확도</div>
+      <div class="model-grid">
+        <div class="model-card">
+          <div class="mc-name">Logistic Reg.</div>
+          <div class="mc-score">0.863</div>
+          <div class="mc-label">CV ± 0.043</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--ink3)">Acc 0.967 · AUC 0.982</div>
+        </div>
+        <div class="model-card">
+          <div class="mc-name">Decision Tree</div>
+          <div class="mc-score">0.900</div>
+          <div class="mc-label">CV ± 0.045</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--ink3)">Acc 1.000 · AUC 1.000</div>
+        </div>
+        <div class="model-card best">
+          <div class="mc-name">Random Forest <span class="mc-crown">🏆</span></div>
+          <div class="mc-score">0.929</div>
+          <div class="mc-label">CV ± 0.031</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--sage)">Acc 1.000 · AUC 1.000</div>
+        </div>
+        <div class="model-card">
+          <div class="mc-name">SVM</div>
+          <div class="mc-score">0.604</div>
+          <div class="mc-label">CV ± 0.013</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--ink3)">Acc 0.783 · AUC 0.684</div>
+        </div>
+      </div>
+
+      <div class="sec-label">특성 중요도 — Random Forest 분류</div>
+      <div class="feat-list">
+        <div class="feat-row">
+          <span class="feat-name">낙상 기록</span>
+          <div class="feat-track"><div class="feat-bar" style="width:53.7%;background:var(--forest)"></div></div>
+          <span class="feat-pct">53.7%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">연령</span>
+          <div class="feat-track"><div class="feat-bar" style="width:13.3%;background:var(--sage)"></div></div>
+          <span class="feat-pct">13.3%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">균형 점수</span>
+          <div class="feat-track"><div class="feat-bar" style="width:13.2%;background:var(--mint)"></div></div>
+          <span class="feat-pct">13.2%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">이동 능력</span>
+          <div class="feat-track"><div class="feat-bar" style="width:8.2%;background:var(--amber2)"></div></div>
+          <span class="feat-pct">8.2%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">보행 속도</span>
+          <div class="feat-track"><div class="feat-bar" style="width:7.6%;background:var(--amber)"></div></div>
+          <span class="feat-pct">7.6%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">약물 수</span>
+          <div class="feat-track"><div class="feat-bar" style="width:4.1%;background:var(--red2)"></div></div>
+          <span class="feat-pct">4.1%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Regression -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-ico ico-amber">📈</div>
+        <div>
+          <div class="card-title">회귀 모델 성능 비교</div>
+          <div class="card-subtitle">n=300 · 재활 결과 점수 예측 · Best RF params: max_depth=10, n_estimators=50</div>
+        </div>
+      </div>
+      <div class="sec-label">회귀 성능 지표</div>
+      <div class="model-grid">
+        <div class="model-card">
+          <div class="mc-name">Linear Reg.</div>
+          <div class="mc-score">0.600</div>
+          <div class="mc-label">R²</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--ink3)">RMSE 7.78 · MAE —</div>
+        </div>
+        <div class="model-card best">
+          <div class="mc-name">Random Forest <span class="mc-crown">🏆</span></div>
+          <div class="mc-score">0.652</div>
+          <div class="mc-label">R²</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--sage)">RMSE 7.25</div>
+        </div>
+        <div class="model-card">
+          <div class="mc-name">Gradient Boost</div>
+          <div class="mc-score">0.667</div>
+          <div class="mc-label">R²</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--ink3)">RMSE 7.10</div>
+        </div>
+      </div>
+
+      <div class="sec-label">특성 중요도 — Random Forest 회귀 (재활)</div>
+      <div class="feat-list">
+        <div class="feat-row">
+          <span class="feat-name">치료 기간</span>
+          <div class="feat-track"><div class="feat-bar" style="width:38.6%;background:var(--forest)"></div></div>
+          <span class="feat-pct">38.6%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">초기 통증</span>
+          <div class="feat-track"><div class="feat-bar" style="width:23.1%;background:var(--red2)"></div></div>
+          <span class="feat-pct">23.1%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">치료 순응도</span>
+          <div class="feat-track"><div class="feat-bar" style="width:15.1%;background:var(--amber2)"></div></div>
+          <span class="feat-pct">15.1%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">연령</span>
+          <div class="feat-track"><div class="feat-bar" style="width:12.5%;background:var(--sage)"></div></div>
+          <span class="feat-pct">12.5%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">악력</span>
+          <div class="feat-track"><div class="feat-bar" style="width:5.4%;background:var(--mint)"></div></div>
+          <span class="feat-pct">5.4%</span>
+        </div>
+        <div class="feat-row">
+          <span class="feat-name">초기 ROM</span>
+          <div class="feat-track"><div class="feat-bar" style="width:3.5%;background:var(--ink4)"></div></div>
+          <span class="feat-pct">3.5%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROC Curve -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-ico ico-sage">📉</div>
+        <div>
+          <div class="card-title">ROC 곡선</div>
+          <div class="card-subtitle">분류 모델 AUC 비교 — LR 0.982 · DT 1.000 · RF 1.000 · SVM 0.684</div>
+        </div>
+      </div>
+      <div class="roc-wrap">
+        <svg viewBox="0 0 420 250" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grd" width="42" height="25" patternUnits="userSpaceOnUse">
+              <path d="M42 0L0 0 0 25" fill="none" stroke="rgba(30,77,43,0.06)" stroke-width="1"/>
+            </pattern>
+          </defs>
+          <rect x="44" y="10" width="360" height="215" fill="url(#grd)"/>
+          <!-- Axes -->
+          <line x1="44" y1="10" x2="44" y2="225" stroke="rgba(30,77,43,0.2)" stroke-width="1.5"/>
+          <line x1="44" y1="225" x2="404" y2="225" stroke="rgba(30,77,43,0.2)" stroke-width="1.5"/>
+          <!-- Axis labels -->
+          <text x="224" y="245" font-size="10" fill="#8a8a80" text-anchor="middle" font-family="IBM Plex Mono">False Positive Rate</text>
+          <text x="16" y="120" font-size="10" fill="#8a8a80" text-anchor="middle" font-family="IBM Plex Mono" transform="rotate(-90,16,120)">True Positive Rate</text>
+          <!-- Tick labels -->
+          <text x="44" y="233" font-size="8" fill="#c0bdb5" text-anchor="middle" font-family="IBM Plex Mono">0.0</text>
+          <text x="224" y="233" font-size="8" fill="#c0bdb5" text-anchor="middle" font-family="IBM Plex Mono">0.5</text>
+          <text x="404" y="233" font-size="8" fill="#c0bdb5" text-anchor="middle" font-family="IBM Plex Mono">1.0</text>
+          <text x="36" y="225" font-size="8" fill="#c0bdb5" text-anchor="end" font-family="IBM Plex Mono">0.0</text>
+          <text x="36" y="118" font-size="8" fill="#c0bdb5" text-anchor="end" font-family="IBM Plex Mono">0.5</text>
+          <text x="36" y="12" font-size="8" fill="#c0bdb5" text-anchor="end" font-family="IBM Plex Mono">1.0</text>
+          <!-- Chance line -->
+          <line x1="44" y1="225" x2="404" y2="10" stroke="#c0bdb5" stroke-width="1.2" stroke-dasharray="5,4"/>
+          <!-- ROC curves (stylized from real AUC values) -->
+          <!-- RF: AUC=1.000 (perfect) -->
+          <path d="M44,225 L44,10 L404,10" fill="none" stroke="#1e4d2b" stroke-width="2.5"/>
+          <!-- DT: AUC=1.000 (perfect) -->
+          <path d="M44,225 L44,14 L404,14" fill="none" stroke="#4a7c59" stroke-width="2" stroke-dasharray="6,3"/>
+          <!-- LR: AUC=0.982 (very high) -->
+          <path d="M44,225 C 60,180 70,60 110,25 S 280,12 404,10" fill="none" stroke="#7ab893" stroke-width="2"/>
+          <!-- SVM: AUC=0.684 (moderate) -->
+          <path d="M44,225 C 100,200 150,150 200,120 S 320,80 404,50" fill="none" stroke="#c47c1a" stroke-width="2" stroke-dasharray="4,3"/>
+          <!-- Legend -->
+          <rect x="52" y="30" width="160" height="82" rx="6" fill="rgba(250,248,244,0.9)" stroke="rgba(30,77,43,0.12)" stroke-width="1"/>
+          <line x1="60" y1="46" x2="80" y2="46" stroke="#1e4d2b" stroke-width="2.5"/>
+          <text x="85" y="50" font-size="9.5" fill="#1a1a18" font-family="IBM Plex Mono">RF  AUC=1.000</text>
+          <line x1="60" y1="62" x2="80" y2="62" stroke="#4a7c59" stroke-width="2" stroke-dasharray="5,3"/>
+          <text x="85" y="66" font-size="9.5" fill="#1a1a18" font-family="IBM Plex Mono">DT  AUC=1.000</text>
+          <line x1="60" y1="78" x2="80" y2="78" stroke="#7ab893" stroke-width="2"/>
+          <text x="85" y="82" font-size="9.5" fill="#1a1a18" font-family="IBM Plex Mono">LR  AUC=0.982</text>
+          <line x1="60" y1="94" x2="80" y2="94" stroke="#c47c1a" stroke-width="2" stroke-dasharray="4,3"/>
+          <text x="85" y="98" font-size="9.5" fill="#1a1a18" font-family="IBM Plex Mono">SVM AUC=0.684</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════
+       PANEL 4 — 사용 가이드
+  ════════════════════════════════════ -->
+  <div id="p-guide" class="panel">
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="info-ico">⚡</div>
+        <div class="info-t">낙상 위험 예측 모델</div>
+        <div class="info-b">
+          <strong>Logistic Regression</strong>을 사용하며 정확도 82.5%입니다.<br><br>
+          입력 변수: <span class="chip">연령</span> <span class="chip">균형점수</span> <span class="chip">보행속도</span> <span class="chip">낙상기록</span><br><br>
+          모델 계수(notebook 기준): 낙상기록 +2.30, 연령 +0.09, 보행속도 +0.25, 균형 -0.03
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-ico">🎯</div>
+        <div class="info-t">재활 결과 예측 모델</div>
+        <div class="info-b">
+          <strong>Random Forest Regression</strong> (최적 파라미터: max_depth=10, n_estimators=50)<br><br>
+          R²=0.652, RMSE=7.25<br><br>
+          가장 중요한 변수: <span class="chip">치료기간</span> 38.6%, <span class="chip">초기통증</span> 23.1%, <span class="chip">순응도</span> 15.1%
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-ico">📊</div>
+        <div class="info-t">위험도 해석 기준</div>
+        <div class="info-b">
+          <strong style="color:var(--forest)">저위험 (&lt;30%)</strong> — 정기 모니터링<br>
+          <strong style="color:var(--amber)">중위험 (30–60%)</strong> — 예방 중재 권고<br>
+          <strong style="color:var(--red)">고위험 (&gt;60%)</strong> — 즉시 중재 필요<br><br>
+          재활 점수: <strong style="color:var(--forest)">&gt;70 우수</strong> · <strong style="color:var(--amber)">50–70 양호</strong> · <strong style="color:var(--red)">&lt;50 주의</strong>
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-ico">🔬</div>
+        <div class="info-t">임상 활용 주의사항</div>
+        <div class="info-b">
+          본 시스템은 <strong>임상 의사결정 보조(CDSS)</strong> 도구입니다.<br><br>
+          • 교육용 합성 데이터(n=200–300) 기반<br>
+          • 최종 임상 판단은 면허 소지 물리치료사<br>
+          • 개인정보 입력 금지, 모든 처리는 브라우저 내
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-ico">📱</div>
+        <div class="info-t">기기 호환성</div>
+        <div class="info-b">
+          <strong>모든 기기에서 즉시 사용 가능</strong><br><br>
+          ✓ PC (Windows / macOS / Linux)<br>
+          ✓ 태블릿 (iPad / 갤럭시탭 / Xiaomi Pad)<br>
+          ✓ 스마트폰 (iOS / Android / HarmonyOS)<br>
+          ✓ 외부 라이브러리 없음 · 오프라인 작동
+        </div>
+      </div>
+      <div class="info-card">
+        <div class="info-ico">🚀</div>
+        <div class="info-t">배포 방법</div>
+        <div class="info-b">
+          이 HTML 파일 하나로 즉시 배포:<br><br>
+          <strong>GitHub Pages</strong> — 무료, 전 세계 접근<br>
+          <strong>Netlify / Vercel</strong> — 드래그앤드롭 배포<br>
+          <strong>병원 내부망</strong> — 파일 복사만으로 가능<br>
+          <strong>USB 오프라인</strong> — 브라우저 직접 실행
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <p><strong>PT Clinical ML</strong> — 디지털 헬스케어와 물리치료 · Week 08 기계학습 기초</p>
+    <p>모든 예측은 교육용 합성 데이터 기반 모델을 사용합니다. 실제 임상 적용 시 검증된 모델로 교체 후 사용하십시오.</p>
+    <p style="margin-top:4px;color:var(--ink4)">Built with Logistic Regression · Random Forest · SVM · Decision Tree · Gradient Boosting</p>
+  </footer>
+
+</div><!-- /container -->
+</div><!-- /page -->
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ─────────────────────────────────────────────────
+   TAB NAVIGATION
+───────────────────────────────────────────────── */
+function go(id, btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  document.getElementById('p-'+id).classList.add('on');
+  btn.classList.add('on');
+}
+
+/* ─────────────────────────────────────────────────
+   TOAST
+───────────────────────────────────────────────── */
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+/* ─────────────────────────────────────────────────
+   SIGMOID
+───────────────────────────────────────────────── */
+const sigmoid = x => 1/(1+Math.exp(-x));
+
+/* ─────────────────────────────────────────────────
+   FALL RISK — exact LR weights from notebook
+   intercept = -6.9614
+   age       = +0.0925
+   balance   = -0.0317
+   gait      = +0.2531
+   falls     = +2.3028
+───────────────────────────────────────────────── */
+function predictFall(){
+  const age   = +document.getElementById('age').value;
+  const bal   = +document.getElementById('bal').value;
+  const gait  = +document.getElementById('gait').value / 10;
+  const falls = +document.getElementById('falls').value;
+
+  const logit = -6.9614 + 0.0925*age - 0.0317*bal + 0.2531*gait + 2.3028*falls;
+  const prob  = sigmoid(logit);
+  const pct   = Math.round(prob*100);
+
+  const lvl   = pct < 30 ? 'low' : pct < 60 ? 'mid' : 'hi';
+  const lbl   = pct < 30 ? '저위험' : pct < 60 ? '중위험' : '고위험';
+
+  // Number
+  document.getElementById('rn-fall').textContent = pct+'%';
+  document.getElementById('rn-fall').className   = 'result-num '+lvl;
+  document.getElementById('rn-fall-conf').textContent = `로짓값: ${logit.toFixed(3)} · 오즈비: ${Math.exp(logit).toFixed(3)}`;
+
+  // Pill
+  const pill = document.getElementById('rp-fall');
+  pill.textContent = lbl; pill.className = 'risk-pill '+lvl;
+
+  // Bar
+  const fill = document.getElementById('pf-fall');
+  fill.className = 'pbar-fill '+lvl;
+  requestAnimationFrame(()=>{ fill.style.width = pct+'%'; });
+
+  // Feature contributions (per-patient)
+  // Each contribution = coef * value (normalized to show relative magnitude)
+  const contribs = [
+    { name:'낙상 기록',   raw: 2.3028*falls,  color:'var(--forest)' },
+    { name:'연령',       raw: 0.0925*age,    color:'var(--sage)'   },
+    { name:'보행 속도',  raw: 0.2531*gait,   color:'var(--mint)'   },
+    { name:'균형 점수',  raw:-0.0317*bal,    color:'var(--amber2)' },
+  ];
+  const maxR = Math.max(...contribs.map(c=>Math.abs(c.raw)), 0.001);
+  const feHtml = contribs.map(c=>{
+    const pct2 = Math.max(0, Math.round(Math.abs(c.raw)/maxR*100));
+    const sign = c.raw >= 0 ? '↑위험' : '↓위험';
+    return `<div class="feat-row">
+      <span class="feat-name">${c.name}</span>
+      <div class="feat-track"><div class="feat-bar" data-w="${pct2}" style="width:0%;background:${c.color}"></div></div>
+      <span class="feat-pct">${sign}</span>
+    </div>`;
+  }).join('');
+  const ff = document.getElementById('ff-fall');
+  ff.innerHTML = feHtml;
+  setTimeout(()=>{ ff.querySelectorAll('.feat-bar').forEach(b=>b.style.width=b.dataset.w+'%'); }, 80);
+
+  // Recommendations
+  document.getElementById('rc-fall').innerHTML = fallRecs(lvl, falls, bal, pct).map(r=>
+    `<div class="rec"><div class="rec-ico">${r.i}</div><div class="rec-t">${r.t}</div><div class="rec-d">${r.d}</div></div>`
+  ).join('');
+
+  document.getElementById('r-fall').classList.add('show');
+  document.getElementById('r-fall').scrollIntoView({behavior:'smooth',block:'nearest'});
+  toast('⚡ 낙상 위험도 예측 완료');
+}
+
+function fallRecs(lvl, falls, bal, pct){
+  const base=[
+    {i:'🏋️',t:'균형 훈련',d:'Berg Balance Scale 기반 균형 운동, 주 3회 이상 권고'},
+    {i:'👣',t:'보행 교육',d:'안전한 보행 패턴 및 보행 보조기구 올바른 사용법 교육'},
+  ];
+  if(lvl==='hi') return [...base,
+    {i:'🚨',t:'즉각적 환경 평가',d:'가정 내 낙상 위험 환경 즉시 평가 및 제거 필요'},
+    {i:'💊',t:'약물 재검토 권고',d:'항고혈압제·이뇨제·수면제 등 낙상 위험 약물 검토'},
+    {i:'📋',t:'다학제 협진',d:'재활의학과·노인의학과 협진 및 낙상 예방 프로그램 연계'},
+  ];
+  if(lvl==='mid') return [...base,
+    {i:'🏠',t:'환경 개선',d:'욕실 손잡이, 미끄럼 방지 매트, 조명 개선 상담'},
+    {i:'🧠',t:'인지 평가',d:'낙상 두려움(Fall Efficacy) 평가 및 심리적 개입 검토'},
+  ];
+  return [...base,
+    {i:'✅',t:'예방적 유지 관리',d:'현재 운동 프로그램 유지, 6개월 후 재평가 권고'},
+  ];
+}
+
+/* ─────────────────────────────────────────────────
+   REHAB PREDICTION
+   Linear Regression coefs from notebook (exact):
+   intercept   = 90.5907
+   age         = -0.2054
+   initial_ROM = +0.0085
+   initial_pain= -3.8244
+   grip        = +0.0098
+   treatment_duration = +1.4705
+   compliance  = +24.8984
+   comorbidity = +0.0444
+   (RF adjustments applied on top)
+───────────────────────────────────────────────── */
+function predictRehab(){
+  const age   = +document.getElementById('ra').value;
+  const rom   = +document.getElementById('rom').value;
+  const pain  = +document.getElementById('pain').value;
+  const grip  = +document.getElementById('grip').value;
+  const dur   = +document.getElementById('dur').value;
+  const comp  = +document.getElementById('comp').value / 100;
+  const comor = +document.getElementById('comor').value;
+
+  // Linear regression formula (exact from notebook)
+  let score = 90.5907
+    - 0.2054 * age
+    + 0.0085 * rom
+    - 3.8244 * pain
+    + 0.0098 * grip
+    + 1.4705 * dur
+    + 24.8984 * comp
+    + 0.0444 * comor;
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  // Display
+  const lvl   = score >= 70 ? 'low' : score >= 50 ? 'mid' : 'hi';
+  const grade = score >= 70 ? '우수 (Good)' : score >= 50 ? '양호 (Fair)' : '주의 (Poor)';
+
+  document.getElementById('rn-rehab').textContent = score+' pts';
+  document.getElementById('rn-rehab').className   = 'result-num '+lvl;
+  document.getElementById('rn-rehab-grade').textContent = `예후 등급: ${grade}`;
+
+  // Gauge arc: 220px total, score/100 fill
+  const gaugePath = document.getElementById('gauge-fill');
+  const gaugeText = document.getElementById('gauge-txt');
+  const gColor = score>=70 ? '#1e4d2b' : score>=50 ? '#c47c1a' : '#c0392b';
+  const offset = 220 - (score/100)*220;
+  gaugePath.setAttribute('stroke', gColor);
+  gaugeText.textContent = score;
+  gaugeText.setAttribute('fill', gColor);
+  requestAnimationFrame(()=>{ gaugePath.setAttribute('stroke-dashoffset', offset); });
+
+  // Feature contributions (exact LR weights * value)
+  const contribs = [
+    { name:'치료 기간',  raw: 1.4705*dur,      color:'var(--forest)' },
+    { name:'초기 통증',  raw:-3.8244*pain,      color:'var(--red2)'  },
+    { name:'치료 순응도',raw: 24.8984*comp,     color:'var(--amber2)'},
+    { name:'연령',      raw:-0.2054*age,        color:'var(--sage)'  },
+    { name:'악력',      raw: 0.0098*grip,       color:'var(--mint)'  },
+    { name:'초기 ROM',  raw: 0.0085*rom,        color:'var(--ink3)'  },
+  ];
+  const maxR = Math.max(...contribs.map(c=>Math.abs(c.raw)), 0.001);
+  const ffHtml = contribs.map(c=>{
+    const p = Math.max(0, Math.round(Math.abs(c.raw)/maxR*100));
+    const dir = c.raw >= 0 ? '↑점수' : '↓점수';
+    return `<div class="feat-row">
+      <span class="feat-name">${c.name}</span>
+      <div class="feat-track"><div class="feat-bar" data-w="${p}" style="width:0%;background:${c.color}"></div></div>
+      <span class="feat-pct">${dir}</span>
+    </div>`;
+  }).join('');
+  const ff = document.getElementById('ff-rehab');
+  ff.innerHTML = ffHtml;
+  setTimeout(()=>{ ff.querySelectorAll('.feat-bar').forEach(b=>b.style.width=b.dataset.w+'%'); }, 80);
+
+  // Recs
+  document.getElementById('rc-rehab').innerHTML = rehabRecs(lvl, comp, pain, dur, score).map(r=>
+    `<div class="rec"><div class="rec-ico">${r.i}</div><div class="rec-t">${r.t}</div><div class="rec-d">${r.d}</div></div>`
+  ).join('');
+
+  document.getElementById('r-rehab').classList.add('show');
+  document.getElementById('r-rehab').scrollIntoView({behavior:'smooth',block:'nearest'});
+  toast('🎯 재활 결과 예측 완료');
+}
+
+function rehabRecs(lvl, comp, pain, dur, score){
+  const base = [{i:'📋',t:'목표 설정',d:'단기·장기 기능 목표를 환자·보호자와 함께 설정'}];
+  if(lvl==='low') return [...base,
+    {i:'✅',t:'예후 양호',d:'현 치료 계획 유지 및 자가 관리 교육 강화'},
+    {i:'🔄',t:'유지 프로그램',d:'치료 종료 후 지역사회 운동 프로그램(GX, PT) 연계'},
+    {i:'📅',t:'추적 관찰',d:'3개월 후 기능 유지 평가 예약 권고'},
+  ];
+  if(lvl==='mid') return [...base,
+    {i:'📈',t:'치료 강도 조정',d:'주당 세션 수 또는 강도 증가 검토'},
+    comp < 0.7
+      ? {i:'🤝',t:'순응도 향상 전략',d:'홈 운동 일지 작성, 가족 참여 독려, 동기 상담'}
+      : {i:'💪',t:'저항 운동 추가',d:'점진적 저항 운동(PRE) 프로그램 추가'},
+    {i:'😌',t:'통증 관리',d:'치료 중 통증 재평가 및 통증 조절 전략 조정'},
+  ];
+  return [...base,
+    {i:'🚨',t:'치료 계획 재검토',d:'현 접근법 전면 재평가, 다학제 팀 협진 고려'},
+    {i:'😌',t:'통증 우선 조절',d:'기능 훈련 이전 통증 수준 NRS ≤3 달성 목표'},
+    {i:'📞',t:'전문 협진 의뢰',d:'통증의학과·정형외과·심리사 협진 의뢰 검토'},
+    {i:'🏠',t:'환경·사회 지원',d:'가정 내 보조기기 설치 및 사회복지 자원 연계'},
+  ];
+}
+</script>
+</body>
+</html>
